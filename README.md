@@ -14,6 +14,8 @@ The scripts described below were used to process all of these tasks and should b
 
 We assume that before starting these steps you have run the scripts in [rosbag_to_mat](https://github.com/nbfigueroa/rosbag_to_mat) to extract the trajectories from the ROSbags into MATLAB data structures required for these steps.
 
+TODO: Make ds-libraries submodules!
+--
 ## Step 1: Trajectory Segmentation for Sequence of DS learning 
 The segmentation step is performed in the following matlab scripts: 
 - ``mitsubishi_segment_trajectories.m``
