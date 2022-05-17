@@ -3,8 +3,11 @@
 This package includes code to segment trajectories of a multi-step demonstrated task. The tasks considered are those that can be defined as a sequence of goal-oriented sub-tasks. In this work, each sub-task is characterized by a a Dynamical System (DS) Motion Policy and an attractor (representing the policy goal) found inside each Action Proposition (AP) region. Segmentation points are inferred tracking state changes in the pre-defined AP regions of the task. 
 
 This approach has been used to learn the following multi-step tasks:
-- **Mitsubishi pick-scan-check-place task:** The robot should grasp electronic components from trays and go through a sequence of pick-and-place steps to scan and check the quality of the part. 
-- **Franka cooking task:** The robot should scoop ingredients from two distinct bowls (emulated as marbles) and transport them and release them in a mixing bowl. 
+- **Industrial pick-scan-check-place task:** The robot should grasp electronic components from trays and go through a sequence of pick-and-place steps to scan and check the quality of the part. 
+- **Franka mixing task:** The robot should scoop ingredients from two distinct bowls (emulated as marbles) and transport them and release them in a mixing bowl. 
+- - **Franka inspection task:** The robot should pick parts from a station, pass them through an inspection tunnel and release them at a target station. 
+<!-- - **Franka table setting task:** The robot grasps plates and cutlery from a dish rack/stand and place them in the demonstrated locations.  -->
+
 <!-- - **Franka table setting task:** The robot grasps plates and cutlery from a dish rack/stand and place them in the demonstrated locations.  -->
 
 The scripts described below were used to process all of these tasks and should be a starting point for any new task. 
@@ -24,7 +27,7 @@ Load the trajectories and visualize the AP regions that will be used for segment
 </p>
 
 <p align="center">    
-    Left: Mitsubishi pick-scan-check-place task, Right: Franka Simple Cooking Task (2 bowls)
+    Left: Industrial pick-scan-check-place task, Right: Franka Simple Cooking Task (2 bowls)
 </p>
 
 In these plots we provide a visualization of the recorded trajectories, tables/stands and the AP regions for each task.   
