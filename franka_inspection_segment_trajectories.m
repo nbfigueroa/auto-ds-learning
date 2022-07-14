@@ -4,8 +4,10 @@
 close all; clear all; clc
 
 % Load Data from Mat File
-mat_data_dir = '../../recordings/icra-22-demo/mat/';
-matfile = strcat(mat_data_dir,'demos_icra2022_raw_data.mat');
+% mat_data_dir = '../../recordings/icra-22-demo/mat/';
+% matfile = strcat(mat_data_dir,'demos_icra2022_raw_data_good.mat');
+mat_data_dir = '../../recordings/mit-museum-demo/mat/';
+matfile = strcat(mat_data_dir,'demos_mit_museum_raw_data.mat');
 load(matfile);
 
 %%%%%% Plot Franka Inspection Workspace (need rosbag_to_mat repo)
@@ -19,17 +21,17 @@ Objects_APregions = plotFrankaInspectionWorkspace(H_pickup_station, H_inspection
 
 % Extract data
 N = size(data_ee_pose,2);
-sample_step  = 2;
+sample_step  = 1;
 data    = {};
 dt_data = [];
 for ii=1:N
     data{ii} = data_ee_pose{ii}.pose(1:3,:);
     dt_data = [dt_data data_ee_pose{ii}.dt]; 
     % Extract desired variables
-    hand_traj  = data{ii}(:,1:sample_step:end);   
+    ee_traj  = data{ii}(:,1:sample_step:end);   
 
     % Plot Cartesian Trajectories
-    scatter3(hand_traj(1,:), hand_traj(2,:), hand_traj(3,:), 7.5, 'MarkerEdgeColor','k','MarkerFaceColor',[rand rand rand]); hold on;
+    scatter3(ee_traj(1,:), ee_traj(2,:), ee_traj(3,:), 7.5, 'MarkerEdgeColor','k','MarkerFaceColor',[rand rand rand]); hold on;
     hold on;
 end
 dt = mean(dt_data);
@@ -70,7 +72,7 @@ end
 % Segment Collected Data based on APRegion State-Tracking
 save_dir = fileparts(matlab.desktop.editor.getActiveFilename) + "/TrajData/";
 % delete(save_dir + "*");
-save(save_dir + "franka_inspection_traj.mat", 'data')
+save(save_dir + "franka_inspection_traj_mit.mat", 'data')
 
 % This should be done in a different way!
 segs = {{}, {}};
@@ -79,7 +81,6 @@ for i=1:length(data)
     prev_t = 1;
     state_change{1}.inROI = false; state_change{1}.track = [];
     state_change{2}.inROI = false; state_change{2}.track = [];
-    state_change{3}.inROI = false; state_change{3}.track = [];
     for t=1:size(data{i}, 2)
         for j=1:length(Objects_APregions)
             hull_V = Objects_APregions{j}.V; 
@@ -100,6 +101,7 @@ for i=1:length(data)
                 end
             end
         end
+
     end   
 end
 
@@ -120,7 +122,7 @@ plotFrankaInspectionWorkspace(H_pickup_station, H_inspection_tunnel, H_release_s
 N_segs = size(segs,2);
 % sample_step  = 1;
 for ii=1:N_segs
-    segs_color = [rand rand rand];    
+    segs_color = [1 rand rand];    
     segs_ii = segs{ii};
     for jj=1:size(segs_ii,2)
         % Plot Cartesian Trajectories
@@ -149,17 +151,17 @@ nfiles = 0;
 %%%%%% Plot Individual Segmented Trajectories on Mitsubishi Workspace (need rosbag_to_mat repo)
 % Plot Segmented data
 plot_segments  = 1;
-% sample_step    = 1;
 sequence_demos = {};
 N_segs = size(segs,2);
-dt_ = mean(dt_data)*sample_step;
+sample_step = 5; %%%%% MAGIC NUMBER (DEPENDS ON SAMPLING RATE AND HOW FAST DEMOS ARE)
+dt_ = mean(dt_data);
 
 if plot_segments;close all;end
-if N_segs > 4
-    ss = 2;
-else
-    ss = 1;
-end
+% if N_segs > 4
+%     ss = 2;
+% else
+%     ss = 1;
+% end
 for ii=1:N_segs
     if plot_segments
         figure('Color',[1 1 1])
@@ -170,7 +172,7 @@ for ii=1:N_segs
     segs_ii     = segs{ii};
 
     for jj=1:size(segs_ii,2)
-        segs_ii{jj} = smoothSegmentedTrajectoryDS(segs_ii{jj}', dt_);
+        segs_ii{jj} = smoothSegmentedTrajectoryDS(segs_ii{jj}', dt_, sample_step);
         if plot_segments
             % Plot Cartesian Trajectories
             scatter3(segs_ii{jj}(1,:), segs_ii{jj}(2,:), segs_ii{jj}(3,:), 7.5, 'MarkerEdgeColor','k','MarkerFaceColor',[rand rand rand]); 
@@ -206,5 +208,5 @@ for ii=1:N_segs
     sequence_ds{ii}.x0_all  = x0_all;
 end
 
-save_file = fileparts(matlab.desktop.editor.getActiveFilename) + "/SegData-DS/franka_Inspection_traj.mat";
+save_file = fileparts(matlab.desktop.editor.getActiveFilename) + "/SegData-DS/franka_inspection_traj_mit.mat";
 save(save_file, 'sequence_ds', 'dt')

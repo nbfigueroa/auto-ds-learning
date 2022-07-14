@@ -1,4 +1,4 @@
-function [ds_gmm, ds_lpv, A_k, b_k, P_opt] = learn_lpvds(Data, Data_sh, att)
+function [ds_gmm, ds_lpv, A_k, b_k, P_opt] = learn_lpvds(Data, Data_sh, att, gmm_type)
 %LEARN_LPVDS Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -9,6 +9,8 @@ Xi_dot_ref  = Data(M+1:end,:);
 axis_limits = axis;
 [~, nb_data] = size(Xi_ref);
 
+
+
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Step 2 (GMM FITTING): Fit GMM to Trajectory Data %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18,9 +20,9 @@ axis_limits = axis;
 % 1: GMM-EM Model Selection via BIC
 % 2: CRP-GMM (Collapsed Gibbs Sampler)
 est_options = [];
-est_options.type             = 0;   % GMM Estimation Algorithm Type
+% est_options.type             = 0;   % GMM Estimation Algorithm Type
 % PC-GMM IS 0 BUT LIGHT_SPEED SHOULD BE COMPILED
-% est_options.type             = 1;   % GMM Estimation Algorithm Type 
+est_options.type             = gmm_type;   % GMM Estimation Algorithm Type 
 
 % If algo 1 selected:
 est_options.maxK             = 10;  % Maximum Gaussians for Type 1
@@ -32,20 +34,22 @@ est_options.samplerIter      = 50;  % Maximum Sampler Iterations
                                     % For type 2: >100 iter are needed
                                     
 est_options.do_plots         = 0;   % Plot Estimation Statistics
-% Size of sub-sampling of trajectories
+% Size of sub-sampling of trajectories for efficient GMM estimation
 % 1/2 for 2D datasets, >2/3 for real
 sub_sample = 1;
 if nb_data > 500
     sub_sample = 2;
 end
 if nb_data > 1000
-        sub_sample = 3;
+        sub_sample = 4;
+end
+if nb_data > 1500
+        sub_sample = 6;
 end
 if nb_data > 2000
-        sub_sample = 5;
+        sub_sample = ceil(nb_data/1500);
 end
 
-sub_sample
 est_options.sub_sample       = sub_sample;       
 
 % Metric Hyper-parameters
@@ -84,7 +88,12 @@ end
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%% DS OPTIMIZATION OPTIONS %%%%%%%%%%%%%%%%%%%%%% 
 % Type of constraints/optimization 
-constr_type = 2;      % 0:'convex':     A' + A < 0 (Proposed in paper)
+if gmm_type == 0
+    constr_type = 2;
+else
+    constr_type = 0;
+end
+                      % 0:'convex':     A' + A < 0 (Proposed in paper)
                       % 1:'non-convex': A'P + PA < 0 (Sina's Thesis approach - not suitable for 3D)
                       % 2:'non-convex': A'P + PA < -Q given P (Proposed in paper)                                 
 init_cvx    = 1;      % 0/1: initialize non-cvx problem with cvx                

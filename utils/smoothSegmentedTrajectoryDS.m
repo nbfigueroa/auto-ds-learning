@@ -1,10 +1,16 @@
-function [seg] = smoothSegmentedTrajectoryDS(seg, dt)
+function [seg] = smoothSegmentedTrajectoryDS(seg, dt, sample_step)
 
 vel_cutting = 0.01;
 pos_cutting = 1e-3;
 
-% Filter Trajectories and Compute Derivatives
-dx_nth = sgolay_time_derivatives(seg, dt, 1, 2, 15);
+
+% Sample trajectories
+seg = seg(1:sample_step:end,:);
+dt = dt*sample_step;
+
+% Filter Trajectories and Compute Derivativess
+% dx_nth = sgolay_time_derivatives(seg, dt, 1, 2, 15);
+dx_nth = sgolay_time_derivatives(seg, dt, 3, 5, 15);
 Xi_ref_tmp     = dx_nth(:,:,1)';
 Xi_dot_ref_tmp = dx_nth(:,:,2)'; 
 

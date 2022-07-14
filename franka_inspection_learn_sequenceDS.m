@@ -5,15 +5,14 @@ close all; clear all; clc
 
 % Will load segmented trajectories from running mitsubishi_segment_trajectories.m script
 pkg_dir = fileparts(matlab.desktop.editor.getActiveFilename);
-data_file = pkg_dir + "/SegData-DS/franka_Inspection_traj.mat";
+data_file = pkg_dir + "/SegData-DS/franka_inspection_traj_mit.mat";
 load(data_file);
 
 % Number of DS
 N_ds = size(sequence_ds,2);
 plot_ds  = 1;
 plot_gmm = 1;
-
-% for s=1:1
+%%
 for s=1:N_ds
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -38,8 +37,14 @@ for s=1:N_ds
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %  Learning: Learn LPV-DS with CORL 2018 Approach  %%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    [ds_gmm, ds_lpv, A_k, b_k, P] = learn_lpvds(sequence_ds{s}.Data, sequence_ds{s}.Data_sh, sequence_ds{s}.att); % learn DS
-    sequence_ds{s}.ds_gmm = ds_gmm; % GMM parameters
+    if s == 1
+        gmm_type = 1;
+    else
+        gmm_type = 0;
+    end
+    [ds_gmm, ds_lpv, A_k, b_k, P] = learn_lpvds(sequence_ds{s}.Data, sequence_ds{s}.Data_sh, sequence_ds{s}.att, gmm_type); % learn DS
+    sequence_ds{s}.ds_gmm   = ds_gmm; % GMM parameters
+    sequence_ds{s}.gmm_type = gmm_type; % GMM parameters    
     sequence_ds{s}.ds_lpv = ds_lpv; % lambda function for DS exection
     sequence_ds{s}.A_k    = A_k; % Linear DS parameters
     sequence_ds{s}.b_k    = b_k; % Linear DS parameters
@@ -110,10 +115,10 @@ for s=1:N_ds
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     %%%%%%%%%%%%%%   Export DS parameters to Mat/Txt/Yaml files  %%%%%%%%%%%%%%%%%%%
-    DS_name = strcat('franka_inspection_ds_', num2str(s));
-%     DS_name = strcat('franka_inspection_ds_A_', num2str(s));
+    % TODO: Write 2 DS models for left and right picking locations!!
+    DS_name = strcat('franka_inspection_ds_museum_', num2str(s));
     save_lpvDS_to_Mat(DS_name, pkg_dir, sequence_ds{s}.ds_gmm, ... 
-    sequence_ds{s}.A_k, sequence_ds{s}.b_k, sequence_ds{s}.att, sequence_ds{s}.x0_all, sequence_ds{s}.dt, ...
+    sequence_ds{s}.A_k, sequence_ds{s}.b_k, sequence_ds{s}.att, sequence_ds{s}.x0_all, sequence_ds{s}.att_all, sequence_ds{s}.dt, ...
     sequence_ds{s}.P, 2, [])
  
     % Yaml format:::: Used in ROS for the lpv-ds C++ library:
@@ -121,16 +126,22 @@ for s=1:N_ds
     % and python-ROS extension:
     % https://github.com/nbfigueroa/ds-opt-py
     save_lpvDS_to_Yaml(DS_name, pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att, ...
-        sequence_ds{s}.x0_all, sequence_ds{s}.dt)
+        sequence_ds{s}.x0_all, sequence_ds{s}.att_all, sequence_ds{s}.dt)
    
     % Text format:::: Used in standalone C++ version of lpvDS-lib     
     save_lpvDS_to_txt(DS_name, pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att)
     
 end
 
-save_file = pkg_dir + "/models/franka_inspection_sequenceDS_icra22demo.mat";
-% save_file = pkg_dir + "/models/franka_inspection_sequenceDS_icra22demo_A.mat";
+% save_file = pkg_dir + "/models/franka_inspection_sequenceDS_icra22demo_good.mat";
+save_file = pkg_dir + "/models/franka_inspection_sequenceDS_museum.mat";
 save(save_file, 'sequence_ds', 'dt')
+
+%% %%
+% Plot 2D slices
+s = 2;
+fig_2dSlice = figure('Color',[1 1 1])
+plot_ds_model_3D_2Dslice(fig_2dSlice, sequence_ds{s}.ds_lpv, sequence_ds{s}.att, ds_plot_options.limits(3:end), [2 3], [])
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Simulate Sequence of DS  %%
