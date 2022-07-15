@@ -5,8 +5,9 @@ close all; clear all; clc
 
 % Will load segmented trajectories from running mitsubishi_segment_trajectories.m script
 pkg_dir = fileparts(matlab.desktop.editor.getActiveFilename);
-data_file = pkg_dir + "/SegData-DS/franka_inspection_traj_mit.mat";
-load(data_file);
+
+segm_data_file = pkg_dir + "/SegData-DS/franka_inspection_traj_mit.mat";
+load(segm_data_file);
 
 % Number of DS
 N_ds = size(sequence_ds,2);

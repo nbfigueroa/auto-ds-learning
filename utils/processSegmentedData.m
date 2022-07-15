@@ -31,6 +31,4 @@ for l=1:N
     % Generate new data structure for SEDS + Diff-DS
     data{l} = data_;
 end
-data_12 = data{1}(:,1:2);
-% dt = abs((data_12(1,1) - data_12(1,2))/data_12(3,1));
 end

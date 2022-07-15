@@ -3,199 +3,133 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 close all; clear all; clc
 
-% Load Data from Mat File
-mat_data_dir = '../../../museum_recordings/mat/';
-matfile = strcat(mat_data_dir,'demos_mit_museum_raw_data.mat');
-load(matfile);
+%%%% Set directories (if recordings are not at the same level as catkin_ws
+%%%% then this should change!
+data_dir          = '../../../museum_recordings/mat/';
+mat_files         = dir(strcat(data_dir,'*.mat'));
+latest_mat        = mat_files(end);
+show_robot        = 0; % To show robot kinematic chain in visualization
+is_museum         = 1; %1: MIT Museum Setup, 0: PENN Figueroa Lab Setup
+do_plot_seg_raw   = 0; % Plot segmented raw labeled trajectories on workspace
+plot_proc_segs    = 1; % Plot processed segments on workspace
+show_vel_profiles = 1; % Show velocity profiles of final segmented data
+
+% This will load the latest trajectory recorded
+load(strcat(data_dir,latest_mat.name));
+[~, matname, ~] = fileparts(latest_mat.name);
+data_raw = data_ee_pose.pose(1:3,:);
+dt_raw   = data_ee_pose.dt;
+
+viz_sample_step  = ceil(length(data_raw)/2000); % Sample step to visualize raw data
+% sample_step = 10; % The data is recorded at 1kHZ this is ALOT of data
+% that is not necessary, this value will downsample the data to get
+% efficient learning, dt is scaled accordingly to learn the model correctly
 
 %%%%%% Plot Franka Inspection Workspace (need rosbag_to_mat repo)
-figure('Color',[1 1 1])
+Objects_APregions = plotFrankaInspectionWorkspace_Trajectories(data_raw(:,1:viz_sample_step:end), is_museum, show_robot);
 
-% Get Station Transforms (should get them from Apriltags or Optitrack)
-[H_pickup_station, H_inspection_tunnel, H_release_station] = computeFrankaInspectionTransforms();
-
-% Plot Franka Inspection Workspace
-Objects_APregions = plotFrankaInspectionWorkspace(H_pickup_station, H_inspection_tunnel, H_release_station);
-
-% Extract data
-N = size(data_ee_pose,2);
-sample_step  = 1;
-data    = {};
-dt_data = [];
-for ii=1:N
-    data{ii} = data_ee_pose{ii}.pose(1:3,:);
-    dt_data = [dt_data data_ee_pose{ii}.dt]; 
-    % Extract desired variables
-    ee_traj  = data{ii}(:,1:sample_step:end);   
-
-    % Plot Cartesian Trajectories
-    scatter3(ee_traj(1,:), ee_traj(2,:), ee_traj(3,:), 7.5, 'MarkerEdgeColor','k','MarkerFaceColor',[rand rand rand]); hold on;
-    hold on;
-end
-dt = mean(dt_data);
-xlabel('$x_1$', 'Interpreter', 'LaTex', 'FontSize',20);
-ylabel('$x_2$', 'Interpreter', 'LaTex','FontSize',20);
-zlabel('$x_3$', 'Interpreter', 'LaTex','FontSize',20);
-title('Franka End-Effector Trajectories',  'Interpreter', 'LaTex','FontSize',20)
-xlim([-0.25 1.75])
-ylim([-1.1 1.1])
-zlim([-1  1.5])
-view([62,22])
-grid on
-axis equal
-
-%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%  Step 2: Segment Demonstrations by tracking APRegion state-change (Felix)  %%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  Step 2: Segment Demonstrations by tracking APRegion State-Change (Felix CORL'2022) %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Process Collected Data for Task Specification Inference
 save_dir = fileparts(matlab.desktop.editor.getActiveFilename) + "/RawData/";
 delete(save_dir + "*"); 
-nfiles = 0;
+% nfiles = 0;
 
-for i=1:length(data)
-    states = [];
-    for j=1:length(Objects_APregions)
-        hull_V = Objects_APregions{j}.V;                                  
-        states = [states; inhull(data{i}(1:3,:)',hull_V')'];                                                                
-    end
-    predicates.WaypointPredicates = states;
-    predicates.ThreatPredicates = [];
-    predicates.PositionPredicates = zeros(size(states));
-    
-    predicates_json = jsonencode(predicates);
-    fid = fopen(save_dir + "franka_Inspection_traj"+num2str(nfiles+i,'%02d')+".json",'w');
-    fprintf(fid, predicates_json); 
+states = [];
+for j=1:length(Objects_APregions)
+    hull_V = Objects_APregions{j}.V;                                  
+    states = [states; inhull(data_raw(1:3,:)',hull_V')'];                                                                
 end
+predicates.WaypointPredicates = states;
+predicates.ThreatPredicates = [];
+predicates.PositionPredicates = zeros(size(states));
+
+predicates_json = jsonencode(predicates);
+fid = fopen(save_dir + matname+"_traj.json",'w');
+fprintf(fid, predicates_json); 
 
 % Segment Collected Data based on APRegion State-Tracking
 save_dir = fileparts(matlab.desktop.editor.getActiveFilename) + "/TrajData/";
-% delete(save_dir + "*");
-save(save_dir + "franka_inspection_traj_mit.mat", 'data')
+save(save_dir + matname+"_traj.mat", 'data_raw')
 
-% This should be done in a different way!
+% This should be done in a different way, for now it's fixed to 2 APRegions
+% that denote the pick and release station
 segs = {{}, {}};
-
-for i=1:length(data)
-    prev_t = 1;
-    state_change{1}.inROI = false; state_change{1}.track = [];
-    state_change{2}.inROI = false; state_change{2}.track = [];
-    for t=1:size(data{i}, 2)
-        for j=1:length(Objects_APregions)
-            hull_V = Objects_APregions{j}.V; 
-            if ~state_change{j}.inROI
-                if inhull(data{i}(1:3,t)',hull_V')
-                    state_change{j}.inROI = true;
-                    state_change{j}.track = [state_change{j}.track data{i}(:, t)];
-                end
+prev_t = 1;
+state_change{1}.inROI = false; state_change{1}.track = [];
+state_change{2}.inROI = false; state_change{2}.track = [];
+for t=1:size(data_raw, 2)
+    for j=1:length(Objects_APregions)
+        hull_V = Objects_APregions{j}.V; 
+        if ~state_change{j}.inROI
+            if inhull(data_raw(1:3,t)',hull_V')
+                state_change{j}.inROI = true;
+                state_change{j}.track = [state_change{j}.track data_raw(:, t)];
+            end
+        else
+            if inhull(data_raw(1:3,t)',hull_V')
+                state_change{j}.track = [state_change{j}.track data_raw(:, t)];
             else
-                if inhull(data{i}(1:3,t)',hull_V')
-                    state_change{j}.track = [state_change{j}.track data{i}(:, t)];
-                else
-                    mid = round(size(state_change{j}.track, 2)/2);
-                    segs{j}{end+1} = data{i}(:, prev_t:t-mid);
-                    prev_t = t-mid+1;
-                    state_change{j}.inROI = false;
-                    state_change{j}.track = [];
-                end
+                mid = round(size(state_change{j}.track, 2)/2);
+                segs{j}{end+1} = data_raw(:, prev_t:t-mid);
+                prev_t = t-mid+1;
+                state_change{j}.inROI = false;
+                state_change{j}.track = [];
             end
         end
+    end
 
-    end   
-end
+end   
 
 for i=1:length(segs)
-    save_file = fileparts(matlab.desktop.editor.getActiveFilename) + "/TrajData/franka_inspection_traj" + ...
-        num2str(i,'%02d') + ".mat";
+    save_file = fileparts(matlab.desktop.editor.getActiveFilename) + "/TrajData/"+ matname + ...
+        num2str(i,'_traj_%02d') + ".mat";
     seg = segs{i};
     save(save_file, 'seg')
 end
 
-
-%% %%%% Plot All Segmented Trajectories on Mitsubishi Workspace (need rosbag_to_mat repo)
-figure('Color',[1 1 1])
-% Plot Franka Inspection Workspace
-plotFrankaInspectionWorkspace(H_pickup_station, H_inspection_tunnel, H_release_station);
-
-% Plot Segmented data
-N_segs = size(segs,2);
-% sample_step  = 1;
-for ii=1:N_segs
-    segs_color = [1 rand rand];    
-    segs_ii = segs{ii};
-    for jj=1:size(segs_ii,2)
-        % Plot Cartesian Trajectories
-        scatter3(segs_ii{jj}(1,:), segs_ii{jj}(2,:), segs_ii{jj}(3,:), 7.5, 'MarkerEdgeColor','k','MarkerFaceColor',segs_color); 
-        hold on;
-    end
-end
-xlabel('$x_1$', 'Interpreter', 'LaTex', 'FontSize',20);
-ylabel('$x_2$', 'Interpreter', 'LaTex','FontSize',20);
-zlabel('$x_3$', 'Interpreter', 'LaTex','FontSize',20);
-title('Franka Segmented End-Effector Trajectories',  'Interpreter', 'LaTex','FontSize',20)
-xlim([-0.25 1.75])
-ylim([-1.1 1.1])
-zlim([-1  1.5])
-view([62,22])
-grid on
-axis equal
-
-%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%  Smoothen and process segmented trajectories for DS learning (Nadia CORL'2018)  %%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-save_dir = fileparts(matlab.desktop.editor.getActiveFilename) + "/SegData-DS/";
-% delete(save_dir + "*"); 
-nfiles = 0;
-
-%%%%%% Plot Individual Segmented Trajectories on Mitsubishi Workspace (need rosbag_to_mat repo)
-% Plot Segmented data
-plot_segments  = 1;
-sequence_demos = {};
-N_segs = size(segs,2);
-sample_step = 5; %%%%% MAGIC NUMBER (DEPENDS ON SAMPLING RATE AND HOW FAST DEMOS ARE)
-dt_ = mean(dt_data);
-
-if plot_segments;close all;end
-% if N_segs > 4
-%     ss = 2;
-% else
-%     ss = 1;
-% end
-for ii=1:N_segs
-    if plot_segments
-        figure('Color',[1 1 1])
-        % Plot Franka Inspection Workspace
-        plotFrankaInspectionWorkspace(H_pickup_station, H_inspection_tunnel, H_release_station);
-        segs_color = [rand rand rand];    
-    end
-    segs_ii     = segs{ii};
-
-    for jj=1:size(segs_ii,2)
-        segs_ii{jj} = smoothSegmentedTrajectoryDS(segs_ii{jj}', dt_, sample_step);
-        if plot_segments
+if do_plot_seg_raw
+    %%%%%% Plot All Segmented Trajectories on Workspace
+    % Visualize Workspace
+    plotFrankaInspectionWorkspace_Trajectories([], is_museum, show_robot);
+    
+    % Plot Segmented Data Over Workspace
+    N_segs = size(segs,2);
+    for ii=1:N_segs
+        segs_color = [1 rand rand];    
+        segs_ii = segs{ii};
+        for jj=1:size(segs_ii,2)
             % Plot Cartesian Trajectories
-            scatter3(segs_ii{jj}(1,:), segs_ii{jj}(2,:), segs_ii{jj}(3,:), 7.5, 'MarkerEdgeColor','k','MarkerFaceColor',[rand rand rand]); 
+            scatter3(segs_ii{jj}(1,1:viz_sample_step:end), segs_ii{jj}(2,1:viz_sample_step:end), segs_ii{jj}(3,1:viz_sample_step:end), 7.5, 'MarkerEdgeColor','k','MarkerFaceColor',segs_color); 
             hold on;
         end
     end
-    
-    if plot_segments
-        xlabel('$x_1$', 'Interpreter', 'LaTex', 'FontSize',20);
-        ylabel('$x_2$', 'Interpreter', 'LaTex','FontSize',20);
-        zlabel('$x_3$', 'Interpreter', 'LaTex','FontSize',20);
-        title_string = strcat('Segmented and Smoothed Trajectories for DS s=', num2str(ii)); 
-        title(title_string,  'Interpreter', 'LaTex','FontSize',20)
-        xlim([-0.25 1.75])
-        ylim([-1.1 1.1])
-        zlim([-1  1.5])
-        grid on
-        axis equal
-        view([62,22])
+    title('Franka Segmented End-Effector Trajectories',  'Interpreter', 'LaTex','FontSize',20)
+end
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Step 3: Smoothen and process segmented trajectories for DS learning (Nadia CORL'2018)  %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+save_dir = fileparts(matlab.desktop.editor.getActiveFilename) + "/SegData-DS/";
+nfiles = 0;
+
+%%%%%% Process Raw Segmented Data
+sequence_demos = {};
+N_segs = size(segs,2);
+proc_sample_step = floor(viz_sample_step/2); %This should give at most 1000 samples for trajectory
+dt_proc = dt_raw*proc_sample_step;
+
+for ii=1:N_segs
+
+    segs_ii     = segs{ii};
+    for jj=1:size(segs_ii,2)
+        segs_ii{jj} = smoothSegmentedTrajectoryDS(segs_ii{jj}', dt_proc, proc_sample_step);
     end
-    
-    
+ 
     % Construct Data Structure for DS Learning
-    sequence_ds{ii}.data = segs_ii;
-    sequence_ds{ii}.dt = dt_;
+    sequence_ds{ii}.data    = segs_ii;
+    sequence_ds{ii}.dt      = dt_proc;
     
     % Process Segmented Data for DS Learning (New)    
     [Data, Data_sh, att, att_all, x0_all] = processSegmentedData(sequence_ds{ii}.data);
@@ -204,7 +138,26 @@ for ii=1:N_segs
     sequence_ds{ii}.att     = att;
     sequence_ds{ii}.att_all = att_all;
     sequence_ds{ii}.x0_all  = x0_all;
+
+    if plot_proc_segs
+        % Visualize Workspace
+        plotFrankaInspectionWorkspace_Trajectories([], is_museum, show_robot);
+        segs_color = [rand rand rand];
+        for jj=1:size(segs_ii,2)
+            % Plot Cartesian Trajectories
+            scatter3(segs_ii{jj}(1,:), segs_ii{jj}(2,:), segs_ii{jj}(3,:), 7.5, 'MarkerEdgeColor','k','MarkerFaceColor',[rand rand rand]); 
+            hold on;
+        end
+        title(strcat('Segmented and Smoothed Trajectories for DS:', num2str(ii)),  'Interpreter', 'LaTex','FontSize',20)
+    end
+
+    % For Debugging: Checking the velocity profiles!
+    figure('Color',[1 1 1]); 
+    if show_vel_profiles
+        subplot(1,2,1); plot(segs_ii{1}(4:end,:)')
+        subplot(1,2,2); plot(segs_ii{2}(4:end,:)')
+    end
 end
 
-save_file = fileparts(matlab.desktop.editor.getActiveFilename) + "/SegData-DS/franka_inspection_traj_mit.mat";
-save(save_file, 'sequence_ds', 'dt')
+save_file = fileparts(matlab.desktop.editor.getActiveFilename) + "/SegData-DS/"+matname+"_traj.mat";
+save(save_file, 'sequence_ds', 'dt_proc')
