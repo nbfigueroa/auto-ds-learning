@@ -22,10 +22,12 @@ load(strcat(mat_dir,latest_mat.name))
 % Get number of DS to learn
 N_ds = size(sequence_ds,2);
 
-%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%     Step 1: Learn a DS for each trajectory cluster      %%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Learn a DS for each trajectory cluster
+close all;
 do_seds = 0;
+% for s=1:1
+% for s=2:2
 for s=1:N_ds
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %  Learning: Learn LPV-DS with CORL 2018 Approach  %%
@@ -39,11 +41,7 @@ for s=1:N_ds
     else
         lyap_constr = 2;     % 0:'convex':     A' + A < 0 (Proposed in paper)
                              % 2:'non-convex': A'P + PA < -Q given P (Proposed in paper) 
-        if s==1
-            symm_constr = 1;% 1: Enforce all A's to be symmetric
-        else
-            symm_constr = 0;     
-        end
+        symm_constr = 0;     % 1: Enforce all A's to be symmetric
         [ds_gmm, ds_lpv, A_k, b_k, P] = learn_lpvds(sequence_ds{s}.Data, sequence_ds{s}.Data_sh, sequence_ds{s}.att, gmm_type, lyap_constr, symm_constr); % learn DS
         sequence_ds{s}.ds_gmm         = ds_gmm; % GMM parameters
         sequence_ds{s}.gmm_type       = gmm_type; % GMM Estimation Type
@@ -71,12 +69,13 @@ for s=1:N_ds
     % Compare Velocities from Demonstration vs DS
     % h_vel = visualizeEstimatedVelocities(sequence_ds{s}.Data, sequence_ds{s}.ds_lpv);
 
+
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %   Export Model: Exporting learned DS paramaters for use in ROS/C++/Python %%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     %%%%%%%%%%%%%%   Export DS parameters to Mat/Txt/Yaml files  %%%%%%%%%%%%%%%%%%%
-%     % TODO: Write 2 DS models for left and right picking locations!!
+    % TODO: Write 2 DS models for left and right picking locations!!
 %     DS_name = strcat('franka_inspection_ds_museum_', num2str(s));
 %     DS_name = strcat(matname, '_DS_', num2str(s));
 %     
@@ -91,76 +90,75 @@ for s=1:N_ds
 %     save_lpvDS_to_Yaml(DS_name, pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att, ...
 %         sequence_ds{s}.x0_all, sequence_ds{s}.att_all, sequence_ds{s}.dt, s)
 
-%     Store a copy of the yaml files each with a different attractor for
-%     "left" and "right" picking locations and with "latest" name for 
+    % Store a copy of the yaml files each with a different attractor for
+    % "left" and "right" picking locations and with "latest" name for 
 end
+
 save_file = pkg_dir + "/models/"+matname+".mat";
 save(save_file, 'sequence_ds')
-%% %%%%%%%%%%%%%%%%%%%%%%%%%%
-%   Plot Learning Results %%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%   
-close all;
-for s=1:N_ds
-    %%%%%%%%%%%%%%    Plot Streamlines of Each Resulting DS  %%%%%%%%%%%%%%%%%%%
+
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %   Plot Learning Results %%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%    
+    %%%%%%%%%%%%%%    Plot Streamlines of Resulting DS  %%%%%%%%%%%%%%%%%%%
     % Fill in plotting options
     if plot_ds
-    % Visualize Workspace
-    if exist('fhandle','var');clear fhandle;end
-    [~,fhandle] = plotFrankaInspectionWorkspace_Trajectories([], is_museum, show_robot);
-    hold on;
+        % Visualize Workspace
+        [~,fhandle] = plotFrankaInspectionWorkspace_Trajectories([], is_museum, show_robot);
+        hold on;
     
-    % Position/Velocity Trajectories
-    vel_samples = 10; vel_size = 0.75; 
-    [h_data, h_att, h_vel] = plot_reference_trajectories_DS(sequence_ds{s}.Data, sequence_ds{s}.att, vel_samples, vel_size);
-    axis_limits = axis;
-    hold on;
+        % Position/Velocity Trajectories
+        vel_samples = 10; vel_size = 0.75; 
+        [h_data, h_att, h_vel] = plot_reference_trajectories_DS(sequence_ds{s}.Data, sequence_ds{s}.att, vel_samples, vel_size);
+        axis_limits = axis;
+        hold on;
+
+        ds_plot_options = [];
+        ds_plot_options.sim_traj      = 1;            % To simulate trajectories from x0_all
+        ds_plot_options.x0_all        = [sequence_ds{s}.x0_all];       % Intial Points
+        ds_plot_options.init_type     = 'ellipsoid';   % For 3D DS, to initialize streamlines
+                                                       % 'ellipsoid' or 'cube'  
+        ds_plot_options.nb_points     = 70;            % No of streamlines to plot (3D)
+        ds_plot_options.sample_points = sequence_ds{s}.Data(1:end/2,1:10:end);
+        ds_plot_options.plot_vol      = 0;            % Plot volume of initial points (3D)
+        ds_plot_options.limits        = axis_limits + [0 0.1 0.0 0.0 0.0 0.20];
+        ds_plot_options.fig_handle    = fhandle;
+        [hd, hs, hr, x_sim] = visualizeEstimatedDS(sequence_ds{s}.Data(1:end/2,:), ds_lpv, ds_plot_options);
+        hold on;
+        
+        % Plot Learned GMM Params
+        if plot_gmm && ~do_seds
+            [h_gmm] = plot3DGMMParams(ds_gmm);
+        end
+
+        % Compute DTWD between train trajectories and reproductions
+        if ds_plot_options.sim_traj
+        nb_traj       = size(x_sim,3);
+        ref_traj_leng = size(sequence_ds{s}.Data,2)/nb_traj;
+        dtwd = zeros(1,nb_traj);
+        for n=1:nb_traj
+            start_id = round(1+(n-1)*ref_traj_leng);
+            end_id   = round(n*ref_traj_leng);
+            dtwd(1,n) = dtw(x_sim(:,:,n)',sequence_ds{s}.Data(1:3,start_id:end_id)',20);
+        end
+        fprintf('LPV-DS got DTWD of reproduced trajectories: %2.4f +/- %2.4f \n', mean(dtwd),std(dtwd));
+        end
     
-    ds_plot_options = [];
-    ds_plot_options.sim_traj      = 1;            % To simulate trajectories from x0_all
-    ds_plot_options.x0_all        = [sequence_ds{s}.x0_all];       % Intial Points
-    ds_plot_options.init_type     = 'ellipsoid';   % For 3D DS, to initialize streamlines
-                                                   % 'ellipsoid' or 'cube'  
-    ds_plot_options.nb_points     = 70;            % No of streamlines to plot (3D)
-    ds_plot_options.sample_points = sequence_ds{s}.Data(1:end/2,1:10:end);
-    ds_plot_options.plot_vol      = 0;            % Plot volume of initial points (3D)
-    ds_plot_options.limits        = axis_limits + [0 0.1 0.0 0.0 0.0 0.20];
-    ds_plot_options.fig_handle    = fhandle;
-    [hd, hs, hr, x_sim] = visualizeEstimatedDS(sequence_ds{s}.Data(1:end/2,:), sequence_ds{s}.ds_lpv, ds_plot_options);
-    hold on;
-    
-    % Plot Learned GMM Params
-    if plot_gmm && ~do_seds
-        if exist('h_gmm','var');clear h_gmm;end
-        [h_gmm] = plot3DGMMParams(sequence_ds{s}.ds_gmm);
+        title_name = strcat('Streamlines of Learned DS s=', num2str(s));
+        title(title_name,  'Interpreter', 'LaTex','FontSize',20)
+
+        if plot_2d_slices
+            fig_2dSlice = figure('Color',[1 1 1], 'Position', [758  551 1163 411]);
+            subplot(1,2,1);plot_ds_model_3D_2Dslice(fig_2dSlice, sequence_ds{s}.ds_lpv, sequence_ds{s}.att, axis_limits(3:end), [1 3], []);
+            xlabel('$x_1$','Interpreter','LaTex','FontSize',15);
+            ylabel('$x_3$','Interpreter','LaTex','FontSize',15);
+            subplot(1,2,2);plot_ds_model_3D_2Dslice(fig_2dSlice, sequence_ds{s}.ds_lpv, sequence_ds{s}.att, axis_limits(3:end), [2 3], []);
+            xlabel('$x_2$','Interpreter','LaTex','FontSize',15);
+            ylabel('$x_3$','Interpreter','LaTex','FontSize',15);
+        end
     end
-    
-    % Compute DTWD between train trajectories and reproductions
-    if ds_plot_options.sim_traj
-    nb_traj       = size(x_sim,3);
-    ref_traj_leng = size(sequence_ds{s}.Data,2)/nb_traj;
-    dtwd = zeros(1,nb_traj);
-    for n=1:nb_traj
-        start_id = round(1+(n-1)*ref_traj_leng);
-        end_id   = round(n*ref_traj_leng);
-        dtwd(1,n) = dtw(x_sim(:,:,n)',sequence_ds{s}.Data(1:3,start_id:end_id)',20);
-    end
-    fprintf('LPV-DS got DTWD of reproduced trajectories: %2.4f +/- %2.4f \n', mean(dtwd),std(dtwd));
-    end
-    
-    title_name = strcat('Streamlines of Learned DS s=', num2str(s));
-    title(title_name,  'Interpreter', 'LaTex','FontSize',20)
-    
-    if plot_2d_slices
-        fig_2dSlice = figure('Color',[1 1 1], 'Position', [758  551 1163 411]);
-        subplot(1,2,1);plot_ds_model_3D_2Dslice(fig_2dSlice, sequence_ds{s}.ds_lpv, sequence_ds{s}.att, axis_limits(3:end), [1 3], []);
-        xlabel('$x_1$','Interpreter','LaTex','FontSize',15);
-        ylabel('$x_3$','Interpreter','LaTex','FontSize',15);
-        subplot(1,2,2);plot_ds_model_3D_2Dslice(fig_2dSlice, sequence_ds{s}.ds_lpv, sequence_ds{s}.att, axis_limits(3:end), [2 3], []);
-        xlabel('$x_2$','Interpreter','LaTex','FontSize',15);
-        ylabel('$x_3$','Interpreter','LaTex','FontSize',15);
-    end
-    end
-end
+
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Simulate Sequence of DS  %%

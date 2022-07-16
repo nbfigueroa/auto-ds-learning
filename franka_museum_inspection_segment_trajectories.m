@@ -1,3 +1,8 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%        Script for Segmenting Trajectories from Latest Recording         %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Step 1: Load Demonstrations Extracted from ROSBags  %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -148,7 +153,7 @@ for ii=1:N_segs
             scatter3(segs_ii{jj}(1,:), segs_ii{jj}(2,:), segs_ii{jj}(3,:), 7.5, 'MarkerEdgeColor','k','MarkerFaceColor',[rand rand rand]); 
             hold on;
         end
-        title(strcat('Segmented and Smoothed Trajectories for DS:', num2str(ii)),  'Interpreter', 'LaTex','FontSize',20)
+        title(strcat('Segmented Trajectories for DS:', num2str(ii)),  'Interpreter', 'LaTex','FontSize',20)
     end
 
     % For Debugging: Checking the velocity profiles!

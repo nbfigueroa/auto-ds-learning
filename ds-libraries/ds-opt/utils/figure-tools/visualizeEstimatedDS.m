@@ -69,10 +69,11 @@ elseif M == 3
         % Plot Demonstrations in red
         [hd] = scatter(Xi_ref_2d(1,:),Xi_ref_2d(2,:),10,[1 0 0],'filled'); hold on
         if isfield(ds_plot_options,'limits')
-            limits_ = ds_plot_options.limits;
+            limits_ = ds_plot_options.limits; 
         else
             limits = axis;
             limits_ = limits + [-0.015 0.015 -0.015 0.015];
+            limits_(end) = limits_(end) + 0.15;
         end
         
         % Plot Streamlines of 2D slice in blue
@@ -100,10 +101,13 @@ elseif M == 3
         end
         
         % Compute Start Locations for Streamlines
+        if isfield(ds_plot_options,'sample_points')
+            x0_all = [x0_all ds_plot_options.sample_points];
+        end
         start_pnts =  sample_initial_points(x0_all, nb_pnts, init_type, plot_volume);
       
         % Plot Streamlines in blue
-        [hs] = plot_ds_model_3D(fig1, ds_fun, [0;0;0], limits, start_pnts, 'low'); hold on;
+        [hs] = plot_ds_model_3D(fig1, ds_fun, [0;0;0],limits, start_pnts, 'low'); hold on;
         
         % Simulate trajectories and plot them on top
         if plot_repr

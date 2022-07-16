@@ -41,7 +41,7 @@ close all; clear all; clc
 % 11: Bumpy Surface         (3D) -- x trajectories recorded at 100Hz
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 pkg_dir         = pwd;
-chosen_dataset  = 11; 
+chosen_dataset  = 7; 
 sub_sample      = 1; % '>2' for real 3D Datasets, '1' for 2D toy datasets
 nb_trajectories = 4; % Only for real 3D data
 [Data, Data_sh, att, x0_all, data, dt] = load_dataset_DS(pkg_dir, chosen_dataset, sub_sample, nb_trajectories);
@@ -122,7 +122,7 @@ options.display       = 1;        % An option to control whether the algorithm
 options.tol_stopping  = 10^-6;    % A small positive scalar defining the stoppping
                                   % tolerance for the optimization solver [default: 10^-10]
 options.max_iter      = 500;      % Maximum number of iteration forthe solver [default: i_max=1000]
-options.objective     = 'likelihood';    % 'mse'/'likelihood'
+options.objective     = 'mse';    % 'mse'/'likelihood'
 sub_sample            = 1;
 
 %running SEDS optimization solver
