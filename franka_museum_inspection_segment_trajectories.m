@@ -1,12 +1,51 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%        Script for Segmenting Trajectories from Latest Recording         %% 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  Step 0: Extract Topics from ROSBAG  %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+clear all; clc; close all
+
+%%%% Set directories (if recordings are not at the same level as catkin_ws
+%%%% then this should change!
+bag_dir      = '../../../museum_recordings/bags/';
+data_dir     = '../../../museum_recordings/mat/';
+bags         = dir(strcat(bag_dir,'*.bag'));
+latest_bag   = bags(end);
+do_plot      = 1;
+sample_step  = 20; % This downsampling is only for visualization!
+show_robot   = 1;
+is_museum    = 1; %1: MIT Museum Setup, 0: PENN Figueroa Lab Setup
+
+%%%% Set Topics of Interest (all of these are geometry_msgs::PoseStamped)
+ee_pose_topic         = '/franka_state_controller/O_T_EE';
+gripper_joints_topic  = '/franka_gripper/joint_states'; 
+% Can be used to aid segmentation, not using it now but should!
+
+%%%% Read Topics Latest Bag
+% Load one bag and visualize info
+[~, bagname, ~] = fileparts(latest_bag.name);
+fprintf('Reading bag %s \n',bagname);
+bag = rosbag(strcat(bag_dir,latest_bag.name));
+% Create data structure for right hand measurements
+data_ee_pose = extractPoseStamped(bag, ee_pose_topic); 
+
+%%%% Visualize Trajectories on Franka Inspection Workspace!!
+if do_plot 
+    % Sub-sampled raw trajectories for visualization
+    ee_traj  = data_ee_pose.pose(1:3,1:sample_step:end); 
+    Objects_APregions = plotFrankaInspectionWorkspace_Trajectories(ee_traj, is_museum, show_robot, [78   569   611   393]);
+end
+
+%%%% Save raw data to matfile
+matfilename = strcat(bagname,'.mat');
+matfile = strcat(data_dir,matfilename);
+save(matfile,'data_ee_pose','bags','bag_dir')
 
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%  Step 1: Load Demonstrations Extracted from ROSBags  %%
+%%  Step 1: Load Demonstrations Extracted from ROSBAG  %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-close all; clear all; clc
 
 %%%% Set directories (if recordings are not at the same level as catkin_ws
 %%%% then this should change!
@@ -17,7 +56,7 @@ show_robot        = 0; % To show robot kinematic chain in visualization
 is_museum         = 1; %1: MIT Museum Setup, 0: PENN Figueroa Lab Setup
 do_plot_seg_raw   = 0; % Plot segmented raw labeled trajectories on workspace
 plot_proc_segs    = 1; % Plot processed segments on workspace
-show_vel_profiles = 1; % Show velocity profiles of final segmented data
+show_vel_profiles = 0; % Show velocity profiles of final segmented data
 
 % This will load the latest trajectory recorded
 load(strcat(data_dir,latest_mat.name));
@@ -30,8 +69,8 @@ viz_sample_step  = ceil(length(data_raw)/2000); % Sample step to visualize raw d
 % that is not necessary, this value will downsample the data to get
 % efficient learning, dt is scaled accordingly to learn the model correctly
 
-%%%%%% Plot Franka Inspection Workspace (need rosbag_to_mat repo)
-Objects_APregions = plotFrankaInspectionWorkspace_Trajectories(data_raw(:,1:viz_sample_step:end), is_museum, show_robot);
+%%%%%% Plot Franka Inspection Workspace
+% Objects_APregions = plotFrankaInspectionWorkspace_Trajectories(data_raw(:,1:viz_sample_step:end), is_museum, show_robot);
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Step 2: Segment Demonstrations by tracking APRegion State-Change (Felix CORL'2022) %%
@@ -146,7 +185,12 @@ for ii=1:N_segs
 
     if plot_proc_segs
         % Visualize Workspace
-        plotFrankaInspectionWorkspace_Trajectories([], is_museum, show_robot);
+        if ii == 1
+            pos = [690   570   610   392];
+        else
+            pos = [1301         572         620         390];
+        end
+        plotFrankaInspectionWorkspace_Trajectories([], is_museum, show_robot, pos);
         segs_color = [rand rand rand];
         for jj=1:size(segs_ii,2)
             % Plot Cartesian Trajectories
@@ -157,8 +201,8 @@ for ii=1:N_segs
     end
 
     % For Debugging: Checking the velocity profiles!
-    figure('Color',[1 1 1]); 
     if show_vel_profiles
+        figure('Color',[1 1 1]);
         subplot(1,2,1); plot(segs_ii{1}(4:end,:)')
         subplot(1,2,2); plot(segs_ii{2}(4:end,:)')
     end

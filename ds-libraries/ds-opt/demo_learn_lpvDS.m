@@ -125,6 +125,18 @@ est_options.length_scale     = [];  % if estimate_l=0 you can define your own
 [Priors, Mu, Sigma] = fit_gmm(Xi_ref, Xi_dot_ref, est_options);
 
 %% Generate GMM data structure for DS learning
+
+%%%% This re-ordering needed to linearize the linear DS @ attractor
+% Order Gaussian parameters based on closeness to attractor 
+[idx] = knnsearch(Mu', att', 'k', size(Mu,2));
+Priors = Priors(:,idx);
+Mu     = Mu(:,idx);
+Sigma  = Sigma(:,:,idx);
+
+% Make the closest Gaussian isotropic and place it at the attractor location
+Sigma(:,:,1) = 1.*max(diag(Sigma(:,:,1)))*eye(M);
+Mu(:,1) = att;
+
 clear ds_gmm; ds_gmm.Mu = Mu; ds_gmm.Sigma = Sigma; ds_gmm.Priors = Priors; 
 
 % (Recommended!) Step 2.1: Dilate the Covariance matrices that are too thin
@@ -152,12 +164,13 @@ end
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%% DS OPTIMIZATION OPTIONS %%%%%%%%%%%%%%%%%%%%%% 
 % Type of constraints/optimization 
-constr_type = 2;      % 0:'convex':     A' + A < 0 (Proposed in paper)
+lyap_constr = 2;      % 0:'convex':     A' + A < 0 (Proposed in paper)
                       % 1:'non-convex': A'P + PA < 0 (Sina's Thesis approach - not suitable for 3D)
                       % 2:'non-convex': A'P + PA < -Q given P (Proposed in paper)                                 
-init_cvx    = 1;      % 0/1: initialize non-cvx problem with cvx                
+init_cvx    = 1;      % 0/1: initialize non-cvx problem with cvx 
+symm_constr = 0;      % This forces all A's to be symmetric (good for simple reaching motions)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if constr_type == 0 || constr_type == 1
+if lyap_constr == 0 || lyap_constr == 1
     P_opt = eye(M);
 else
     % P-matrix learning
@@ -170,11 +183,11 @@ else
 end
 
 %%%%%%%%  LPV system sum_{k=1}^{K}\gamma_k(xi)(A_kxi + b_k) %%%%%%%%  
-if constr_type == 1
-    [A_k, b_k, P_est] = optimize_lpv_ds_from_data(Data_sh, zeros(M,1), constr_type, ds_gmm, P_opt, init_cvx);
+if lyap_constr == 1
+    [A_k, b_k, ~] = optimize_lpv_ds_from_data(Data_sh, zeros(M,1), lyap_constr, ds_gmm, P_opt, init_cvx);
     ds_lpv = @(x) lpv_ds(x-repmat(att,[1 size(x,2)]), ds_gmm, A_k, b_k);
 else
-    [A_k, b_k, P_est] = optimize_lpv_ds_from_data(Data, att, constr_type, ds_gmm, P_opt, init_cvx);
+    [A_k, b_k, ~] = optimize_lpv_ds_from_data(Data, att, lyap_constr, ds_gmm, P_opt, init_cvx, symm_constr);
     ds_lpv = @(x) lpv_ds(x, ds_gmm, A_k, b_k);
 end
 
