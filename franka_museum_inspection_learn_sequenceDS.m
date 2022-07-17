@@ -111,11 +111,13 @@ save_lpvDS_to_Yaml('franka_museum_latest_ds2', pkg_dir,  sequence_ds{s}.ds_gmm, 
 
 save_file = pkg_dir + "/models/"+matname+".mat";
 save(save_file, 'sequence_ds')
+delete penm_log.txt
+
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%
 %   Plot Learning Results %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%   
 close all;
-plot_2d_slices = 1; 
+plot_2d_slices = 0; 
 for s=1:N_ds
     %%%%%%%%%%%%%%    Plot Streamlines of Each Resulting DS  %%%%%%%%%%%%%%%%%%%
     % Fill in plotting options
@@ -123,9 +125,9 @@ for s=1:N_ds
     % Visualize Workspace
     if exist('fhandle','var');clear fhandle;end
     if s == 1
-        pos = [73   560   711   402];
+        pos = [261    39   701   409]; 
     else
-        pos = [797   558   694   404];
+        pos = [962    40   708   407];
     end
     [~,fhandle] = plotFrankaInspectionWorkspace_Trajectories([], is_museum, show_robot, pos);
     hold on;
