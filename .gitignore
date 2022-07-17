@@ -30,4 +30,7 @@
 *.exe
 *.out
 *.app
-*.mex*
+
+# Mex files
+ds-libraries/thirdparty/lightspeed/*.mexa64
+ds-libraries/thirdparty/lightspeed/*.so
