@@ -68,7 +68,7 @@ Mu     = Mu(:,idx);
 Sigma  = Sigma(:,:,idx);
 
 % Make the closet Gaussian isotropic and place it at the attractor location
-Sigma(:,:,1) = min(2*max(diag(Sigma(:,:,1))),0.0125)*eye(M);
+Sigma(:,:,1) = min(2*max(diag(Sigma(:,:,1))),0.015)*eye(M);
 Mu(:,1) = att;
 
 if true

@@ -115,7 +115,7 @@ save(save_file, 'sequence_ds')
 %   Plot Learning Results %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%   
 close all;
-% plot_2d_slices = 0; 
+plot_2d_slices = 1; 
 for s=1:N_ds
     %%%%%%%%%%%%%%    Plot Streamlines of Each Resulting DS  %%%%%%%%%%%%%%%%%%%
     % Fill in plotting options
