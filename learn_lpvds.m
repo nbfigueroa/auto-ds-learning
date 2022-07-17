@@ -1,4 +1,4 @@
-function [ds_gmm, ds_lpv, A_k, b_k, P_opt] = learn_lpvds(Data, Data_sh, att, gmm_type, lyap_constr, symm_constr)
+function [ds_gmm, ds_lpv, A_k, b_k, P_opt] = learn_lpvds(Data, Data_sh, att, gmm_type, lyap_constr, symm_constr, metric_sens)
 %LEARN_LPVDS Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -38,9 +38,6 @@ sub_sample = 1;
 if nb_data > 1000
         sub_sample = ceil(nb_data/1000);
 end
-% if nb_data > 1500
-%         sub_sample = 2;
-% end
 if nb_data > 2000
         sub_sample = ceil(nb_data/2000);
 end
@@ -48,7 +45,7 @@ est_options.sub_sample       = sub_sample;
 
 % Metric Hyper-parameters
 est_options.estimate_l       = 1;   % '0/1' Estimate the lengthscale, if set to 1
-est_options.l_sensitivity    = 5;   % lengthscale sensitivity [1-10->>100]
+est_options.l_sensitivity    = metric_sens;   % lengthscale sensitivity [1-10->>100]
                                     % Default value is set to '2' as in the
                                     % paper, for very messy, close to
                                     % self-intersecting trajectories, we
@@ -59,6 +56,10 @@ est_options.length_scale     = [];  % if estimate_l=0 you can define your own
 
 % Fit GMM to Trajectory Data
 [Priors, Mu, Sigma] = fit_gmm(Xi_ref, Xi_dot_ref, est_options);
+% if length(Priors) < 7 % Try again
+%     [Priors, Mu, Sigma] = fit_gmm(Xi_ref, Xi_dot_ref, est_options);
+% end
+
 
 % Order Gaussian parameters based on closeness to attractor 
 [idx] = knnsearch(Mu', att', 'k', size(Mu,2));
@@ -67,7 +68,7 @@ Mu     = Mu(:,idx);
 Sigma  = Sigma(:,:,idx);
 
 % Make the closet Gaussian isotropic and place it at the attractor location
-Sigma(:,:,1) = 2*max(diag(Sigma(:,:,1)))*eye(M);
+Sigma(:,:,1) = min(2*max(diag(Sigma(:,:,1))),0.0125)*eye(M);
 Mu(:,1) = att;
 
 if true

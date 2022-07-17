@@ -188,7 +188,7 @@ for ii=1:N_segs
         if ii == 1
             pos = [690   570   610   392];
         else
-            pos = [1301         572         620         390];
+            pos = [1297 563 624 399];
         end
         plotFrankaInspectionWorkspace_Trajectories([], is_museum, show_robot, pos);
         segs_color = [rand rand rand];

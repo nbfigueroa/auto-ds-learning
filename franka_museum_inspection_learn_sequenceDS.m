@@ -10,7 +10,7 @@ mat_dir        = pkg_dir + "/SegData-DS/";
 mat_files      = dir(strcat(mat_dir,'*.mat'));
 latest_mat     = mat_files(end);
 plot_ds        = 1; % To plot the learned DS' on the workspace
-plot_2d_slices = 1; 
+plot_2d_slices = 0; 
 plot_gmm       = 1; % To plot the corresponding GMM params
 show_robot     = 0; % To show robot kinematic chain in visualization
 is_museum      = 1; %1: MIT Museum Setup, 0: PENN Figueroa Lab Setup
@@ -39,12 +39,15 @@ for s=1:N_ds
     else
         lyap_constr = 2;     % 0:'convex':     A' + A < 0 (Proposed in paper)
                              % 2:'non-convex': A'P + PA < -Q given P (Proposed in paper) 
-        if s==1
-            symm_constr = 0;% 1: Enforce all A's to be symmetric
+        symm_constr = 0;     % 1: Enforce all A's to be symmetric
+        gmm_type    = 0;     % Type of GMM estimation technique 0:Phys-GMM, 1: BIC
+        if s==1               
+%             symm_constr = 1;
+            metric_sens = 1; % Sensitivity for similarity kernel (lower for simpler motions)
         else
-            symm_constr = 0;     
+            metric_sens = 10;
         end
-        [ds_gmm, ds_lpv, A_k, b_k, P] = learn_lpvds(sequence_ds{s}.Data, sequence_ds{s}.Data_sh, sequence_ds{s}.att, gmm_type, lyap_constr, symm_constr); % learn DS
+        [ds_gmm, ds_lpv, A_k, b_k, P] = learn_lpvds(sequence_ds{s}.Data, sequence_ds{s}.Data_sh, sequence_ds{s}.att, gmm_type, lyap_constr, symm_constr, metric_sens); % learn DS
         sequence_ds{s}.ds_gmm         = ds_gmm; % GMM parameters
         sequence_ds{s}.gmm_type       = gmm_type; % GMM Estimation Type
         sequence_ds{s}.lyap_constr    = lyap_constr; % Lyapunov Constraint Type
@@ -77,7 +80,7 @@ for s=1:N_ds
     
     %%%%%%%%%%%%%%   Export DS parameters to Mat/Txt/Yaml files  %%%%%%%%%%%%%%%%%%%
     % TODO: Write 2 DS models for left and right picking locations!!
-    DS_name = strcat(matname, '_DS_', num2str(s));
+    DS_name = strcat(matname, '_DS', num2str(s));
     
     save_lpvDS_to_Mat(DS_name, pkg_dir, sequence_ds{s}.ds_gmm, ... 
     sequence_ds{s}.A_k, sequence_ds{s}.b_k, sequence_ds{s}.att, sequence_ds{s}.x0_all, sequence_ds{s}.att_all, sequence_ds{s}.dt, ...
@@ -91,19 +94,19 @@ for s=1:N_ds
         sequence_ds{s}.x0_all, sequence_ds{s}.att_all, sequence_ds{s}.dt, s)
 
 end
-
-%%
-%     Store a copy of the yaml files each with a different attractor for
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%    Store a copy of the yaml files each with a different attractor for
 %     "left" and "right" picking locations and with "latest" name
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 s = 1; [~, idx] = min(sequence_ds{1}.att_all(2,:)); 
-save_lpvDS_to_Yaml('franka_museum_latest_ds_1_left', pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att, ...
+save_lpvDS_to_Yaml('franka_museum_latest_ds1_left', pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att, ...
     sequence_ds{s}.x0_all, sequence_ds{s}.att_all(:,idx), sequence_ds{s}.dt, s);
 [~, idx] = max(sequence_ds{1}.att_all(2,:));
-save_lpvDS_to_Yaml('franka_museum_latest_ds_1_right', pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att, ...
+save_lpvDS_to_Yaml('franka_museum_latest_ds1_right', pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att, ...
     sequence_ds{s}.x0_all, sequence_ds{s}.att_all(:,idx), sequence_ds{s}.dt, s); 
 
 s = 2;        
-save_lpvDS_to_Yaml('franka_museum_latest_ds_2', pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att, ...
+save_lpvDS_to_Yaml('franka_museum_latest_ds2', pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att, ...
     mean(sequence_ds{2}.att_all,2), sequence_ds{s}.att_all(:,idx), sequence_ds{s}.dt, s);       
 
 save_file = pkg_dir + "/models/"+matname+".mat";
@@ -112,13 +115,19 @@ save(save_file, 'sequence_ds')
 %   Plot Learning Results %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%   
 close all;
+% plot_2d_slices = 0; 
 for s=1:N_ds
     %%%%%%%%%%%%%%    Plot Streamlines of Each Resulting DS  %%%%%%%%%%%%%%%%%%%
     % Fill in plotting options
     if plot_ds
     % Visualize Workspace
     if exist('fhandle','var');clear fhandle;end
-    [~,fhandle] = plotFrankaInspectionWorkspace_Trajectories([], is_museum, show_robot);
+    if s == 1
+        pos = [73   560   711   402];
+    else
+        pos = [797   558   694   404];
+    end
+    [~,fhandle] = plotFrankaInspectionWorkspace_Trajectories([], is_museum, show_robot, pos);
     hold on;
     
     % Position/Velocity Trajectories
