@@ -101,7 +101,8 @@ end
 s = 1; [~, idx] = min(sequence_ds{1}.att_all(2,:)); 
 % Fix this based on location of inspection station!
 att_ds1_left = sequence_ds{s}.att_all(:,idx);
-att_ds1_left(3) = att_ds1_left(3) - 0.01; 
+att_ds1_left = [0.5187083613275465, -0.42374842743022534, 0.2866012621200316];
+% x: ]
 
 save_lpvDS_to_Yaml('franka_museum_latest_ds1_left', pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att, ...
     sequence_ds{s}.x0_all, att_ds1_left, sequence_ds{s}.dt, s);
@@ -109,7 +110,7 @@ save_lpvDS_to_Yaml('franka_museum_latest_ds1_left', pkg_dir,  sequence_ds{s}.ds_
 
 % Fix this based on location of inspection station!
 att_ds1_right = sequence_ds{s}.att_all(:,idx);
-att_ds1_right(3) = att_ds1_right(3) - 0.01;
+att_ds1_right = [0.5211917164002695, -0.3080776148608209, 0.28104977136909953];
 save_lpvDS_to_Yaml('franka_museum_latest_ds1_right', pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att, ...
     sequence_ds{s}.x0_all, att_ds1_right, sequence_ds{s}.dt, s); 
 
