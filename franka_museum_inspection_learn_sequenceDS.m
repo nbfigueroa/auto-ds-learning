@@ -1,6 +1,9 @@
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Learn Sequence of N Segmented Demonstrations as N LPV-DS  %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% NOTE: THIS SCRIPT WORKS ASSUMMING AN OPTIMAL DEMONSTRATION OF THE PICK
+% AND INSPECT TASK!
+
 close all; clear all; clc
 
 %%%% Set directories (if recordings are not at the same level as catkin_ws
@@ -99,18 +102,15 @@ end
 %     "left" and "right" picking locations and with "latest" name
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 s = 1; [~, idx] = min(sequence_ds{1}.att_all(2,:)); 
+
 % Fix this based on location of inspection station!
 att_ds1_left = sequence_ds{s}.att_all(:,idx);
-att_ds1_left(1) = att_ds1_left(1) - 0.005; 
-att_ds1_left(3) = att_ds1_left(3) - 0.01; 
-
 save_lpvDS_to_Yaml('franka_museum_latest_ds1_left', pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att, ...
     sequence_ds{s}.x0_all, att_ds1_left, sequence_ds{s}.dt, s);
 [~, idx] = max(sequence_ds{1}.att_all(2,:));
 
 % Fix this based on location of inspection station!
 att_ds1_right = sequence_ds{s}.att_all(:,idx);
-% att_ds1_right(1) = att_ds1_right(1) - 0.005;
 att_ds1_right(3) = att_ds1_right(3) - 0.01;
 save_lpvDS_to_Yaml('franka_museum_latest_ds1_right', pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att, ...
     sequence_ds{s}.x0_all, att_ds1_right, sequence_ds{s}.dt, s); 
@@ -118,7 +118,6 @@ save_lpvDS_to_Yaml('franka_museum_latest_ds1_right', pkg_dir,  sequence_ds{s}.ds
 s = 2;        
 save_lpvDS_to_Yaml('franka_museum_latest_ds2', pkg_dir,  sequence_ds{s}.ds_gmm, sequence_ds{s}.A_k, sequence_ds{s}.att, ...
     sequence_ds{2}.att_all, sequence_ds{s}.att_all, sequence_ds{s}.dt, s);       
-
 save_file = pkg_dir + "/models/"+matname+".mat";
 save(save_file, 'sequence_ds')
 delete penm_log.txt
